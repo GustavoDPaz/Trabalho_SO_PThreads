@@ -20,7 +20,6 @@ pthread_mutex_t mutex_bloco;
 pthread_mutex_t mutex_primos;
 
 int ehPrimo(int n);
-int primo(int n);
 void alocarMatriz();
 void preencherMatriz();
 void liberarMatriz();
@@ -53,6 +52,12 @@ int percorrer(int lin, int col, int m[lin][col])
 
 int main()
 {
+    if (MATRIZ_LINHAS % BLOCO_LINHAS != 0 || MATRIZ_COLUNAS % BLOCO_COLUNAS != 0)
+    {
+        printf("Erro: As dimensoes da matriz devem ser multiplas do macrobloco!\n");
+        return 1;
+    }
+
     printf("Matriz: %d x %d\n", MATRIZ_LINHAS, MATRIZ_COLUNAS);
     printf("Macrobloco: %d x %d\n", BLOCO_LINHAS, BLOCO_COLUNAS);
     printf("Numero de Threads: %d\n", NUM_THREADS);
@@ -90,7 +95,7 @@ int main()
     return 0;
 }
 
-int primo(int n)
+int ehPrimo(int n)
 {
     if (n < 2)
     {
@@ -106,11 +111,6 @@ int primo(int n)
         }
     }
     return 1;
-}
-
-int ehPrimo(int n)
-{
-    return primo(n);
 }
 
 void alocarMatriz()
@@ -175,9 +175,9 @@ int buscaSerial()
 
 void *funcaoThread(void *arg)
 {
-    (void)arg;
-
+    int id = *(int *)arg;
     int blocos_por_linha = MATRIZ_COLUNAS / BLOCO_COLUNAS;
+    int blocos_processados = 0;
 
     while (1)
     {
@@ -195,6 +195,8 @@ void *funcaoThread(void *arg)
         {
             break;
         }
+
+        blocos_processados++;
 
         int bloco_lin = meu_bloco / blocos_por_linha;
         int bloco_col = meu_bloco % blocos_por_linha;
@@ -234,10 +236,12 @@ void buscaParalela()
     pthread_mutex_init(&mutex_primos, NULL);
 
     pthread_t threads[NUM_THREADS];
+    int ids[NUM_THREADS];
 
     for (int i = 0; i < NUM_THREADS; i++)
     {
-        pthread_create(&threads[i], NULL, funcaoThread, NULL);
+        ids[i] = i;
+        pthread_create(&threads[i], NULL, funcaoThread, &ids[i]);
     }
 
     for (int i = 0; i < NUM_THREADS; i++)

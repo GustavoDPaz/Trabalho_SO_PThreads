@@ -115,7 +115,7 @@ int ehPrimo(int n)
 
 void alocarMatriz()
 {
-    matriz = (int **)malloc(MATRIZ_LINHAS * sizeof(int *));
+    matriz = (int **)calloc(MATRIZ_LINHAS, sizeof(int *));
     if (matriz == NULL)
     {
         exit(1);
@@ -123,7 +123,7 @@ void alocarMatriz()
 
     for (int i = 0; i < MATRIZ_LINHAS; i++)
     {
-        matriz[i] = (int *)malloc(MATRIZ_COLUNAS * sizeof(int));
+        matriz[i] = (int *)calloc(MATRIZ_COLUNAS, sizeof(int));
         if (matriz[i] == NULL)
         {
             exit(1);

@@ -19,7 +19,8 @@ int main()
 
 int primo(int n)
 {
-    for (int i = 2; i <= sqrt(n); i++)
+    int squirtle = sqrt(n);
+    for (int i = 2; i <= squirtle; i++)
     {
         if (n % i == 0)
         {

@@ -12,6 +12,7 @@
                 "-std=c11",
                 "-pthread",
                 "${workspaceFolder}/main.c",
+                "-lm",
                 "-o",
                 "${workspaceFolder}/main.exe"
             ],

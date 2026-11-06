@@ -1,26 +1,30 @@
+// apaga os comentario mais doidinho antes da gente enviar
+
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
 
-#define MATRIZ_LINHAS 1000
-#define MATRIZ_COLUNAS 1000
+#define MATRIZ_LINHAS 3000
+#define MATRIZ_COLUNAS 3000
 #define BLOCO_LINHAS 100
 #define BLOCO_COLUNAS 100
-#define NUM_THREADS 4
+#define NUM_THREADS 8 // eu to pensando aqui, a especificação falou pra só considerar os núcleos de performance, mas ficou meio
+// aberto se isso quer dizer que tem que forçar o programa a utilizar só os nucleos de performance (tipo aquela opção do gerenciador)
+// de tarefas de limitar quais CPUs o processo pode usar) ou se é só pra colocar o numero de threads equivalente mesmo.
+// (Eu, André, tenho um notebook com um i5 12450HX, que tem 4 núcleos de performance e 4 de eficiência / 12 threads)
 #define SEMENTE 42
 
 int **matriz = NULL;
 int total_primos_paralelo = 0;
-int proximo_macrobloco = 0;
+int proximo_bloco = 0;
 int total_macroblocos = 0;
 
-pthread_mutex_t mutex_bloco;
-pthread_mutex_t mutex_primos;
+pthread_mutex_t mutex_bloco;  // mutex q controla o acesso a blocos
+pthread_mutex_t mutex_primos; // mutex q controla acesso ao contador de primos
 
 int ehPrimo(int n);
-int primo(int n);
 void alocarMatriz();
 void preencherMatriz();
 void liberarMatriz();
@@ -28,31 +32,19 @@ int buscaSerial();
 void *funcaoThread(void *arg);
 void buscaParalela();
 
-/*
-int proxIndex(); // acho que a gente vai ter que criar uma função pra descobrir
-// qual vai ser o proximo indice tlgd? Não sei explicar direito, mas como a gente vai
-// ter que percorrer linha e coluna né, não da pra ficar fazendo for só com i++ o tempo
-// inteiro. sei lá mano, to só declarando aqui já pra poder botar de placeholder no cod.
-// Na verdade ao invez de proximo, talvez seja uma função que retorna uma array com 2 de
-// tamanho com a linha e a coluna; muitas perguntas.
-
-int percorrer(int lin, int col, int m[lin][col])
-{
-    // [[1, 2], [1, 3], [1,4]]
-    int n = 0;
-    int tamanho = lin * col;
-    int l = 0, c = 0;
-    while (n < tamanho)
-    {
-        primo(m[l, c]);
-        l++;
-    }
-    return 0;
-}
-*/
-
 int main()
 {
+    // A especificação não dizia o que fazer caso o tamanho do bloco seja divisivel pelo tamanho da matriz mas o numero de linhas
+    // ou colunas do bloco não é divisível pelo numero de linhas ou colunas da matriz, então decidimos simplesmente não deixar.
+    // Eu acho que eu fui a unica pessoa que ficou quebrando a cabeça com isso, então acho que era isso que o trabalho queria
+    // mesmo, mas acho que seria interessante revisitar esse problema depois de divisão de matriz sem necessariamente exigir
+    // blocos "visualmente continuos".
+    if (MATRIZ_LINHAS % BLOCO_LINHAS != 0 || MATRIZ_COLUNAS % BLOCO_COLUNAS != 0)
+    {
+        printf("ATENCAO!!!!!!! Os numeros colocados para o tamanho dos blocos (linhas/colunas) nao sao divisiveis pelas linhas/colunas da matriz.");
+        return 1;
+    }
+
     printf("Matriz: %d x %d\n", MATRIZ_LINHAS, MATRIZ_COLUNAS);
     printf("Macrobloco: %d x %d\n", BLOCO_LINHAS, BLOCO_COLUNAS);
     printf("Numero de Threads: %d\n", NUM_THREADS);
@@ -64,24 +56,25 @@ int main()
 
     alocarMatriz();
     preencherMatriz();
-
-    clock_t inicio_serial = clock();
+    clock_t ini_serial = clock();
     int primos_serial = buscaSerial();
     clock_t fim_serial = clock();
-    double tempo_serial = (double)(fim_serial - inicio_serial) / CLOCKS_PER_SEC;
+    double t_serial = (double)(fim_serial - ini_serial) / CLOCKS_PER_SEC;
+    // todo mundo usa os mesmo nomes de variável, o que é muito chato, mas acho que eu nao tenho capacidade mental de usar o tipo
+    // de nome que eu usava em prog 2 num problema complicado desses então estou deixando aqui nomes bonitinhos
 
-    printf("Serial - Primos: %d | Tempo: %.4f s\n", primos_serial, tempo_serial);
+    printf("Serial - Primos: %d | Tempo: %.4f s\n", primos_serial, t_serial);
 
-    clock_t inicio_paralelo = clock();
+    clock_t ini_paralelo = clock();
     buscaParalela();
     clock_t fim_paralelo = clock();
-    double tempo_paralelo = (double)(fim_paralelo - inicio_paralelo) / CLOCKS_PER_SEC;
+    double t_paralelo = (double)(fim_paralelo - ini_paralelo) / CLOCKS_PER_SEC;
 
-    printf("Paralelo - Primos: %d | Tempo: %.4f s\n", total_primos_paralelo, tempo_paralelo);
+    printf("Paralelo - Primos: %d | Tempo: %.4f s\n", total_primos_paralelo, t_paralelo);
 
-    if (tempo_paralelo > 0.0)
+    if (t_paralelo > 0.0)
     {
-        double speedup = tempo_serial / tempo_paralelo;
+        double speedup = t_serial / t_paralelo;
         printf("Speedup: %.2fx\n", speedup);
     }
 
@@ -90,14 +83,18 @@ int main()
     return 0;
 }
 
-int primo(int n)
+int ehPrimo(int n)
 {
+    // sinceramente, não sei se deixar isso aqui deixa a função "menos otimizada" que nem a especificação pede
+    // ou mais otimizada, como os testes variam muito acho que precisa de uma análise estatística que eu n vou
+    // fazer nem ferrando pq n pediram mesmo
     if (n < 2)
     {
         return 0;
     }
 
     int squirtle = sqrt(n);
+    // probleminha de prog 1, saudades
     for (int i = 2; i <= squirtle; i++)
     {
         if (n % i == 0)
@@ -106,11 +103,6 @@ int primo(int n)
         }
     }
     return 1;
-}
-
-int ehPrimo(int n)
-{
-    return primo(n);
 }
 
 void alocarMatriz()
@@ -159,18 +151,19 @@ void liberarMatriz()
 
 int buscaSerial()
 {
-    int contador = 0;
+    // c = contador 😱
+    int c = 0;
     for (int i = 0; i < MATRIZ_LINHAS; i++)
     {
         for (int j = 0; j < MATRIZ_COLUNAS; j++)
         {
             if (ehPrimo(matriz[i][j]))
             {
-                contador++;
+                c++;
             }
         }
     }
-    return contador;
+    return c;
 }
 
 void *funcaoThread(void *arg)
@@ -181,23 +174,24 @@ void *funcaoThread(void *arg)
 
     while (1)
     {
-        int meu_bloco = -1;
+        int bloco_atual = -1;
 
         pthread_mutex_lock(&mutex_bloco);
-        if (proximo_macrobloco < total_macroblocos)
+        if (proximo_bloco < total_macroblocos)
         {
-            meu_bloco = proximo_macrobloco;
-            proximo_macrobloco++;
+            bloco_atual = proximo_bloco;
+            proximo_bloco++;
         }
         pthread_mutex_unlock(&mutex_bloco);
 
-        if (meu_bloco == -1)
+        if (bloco_atual == -1)
         {
+            // finalmente uma matéria nesse curso que a gente pode usar while "true" e break
             break;
         }
 
-        int bloco_lin = meu_bloco / blocos_por_linha;
-        int bloco_col = meu_bloco % blocos_por_linha;
+        int bloco_lin = bloco_atual / blocos_por_linha;
+        int bloco_col = bloco_atual % blocos_por_linha;
 
         int lin_inicio = bloco_lin * BLOCO_LINHAS;
         int lin_fim = lin_inicio + BLOCO_LINHAS;
@@ -205,20 +199,20 @@ void *funcaoThread(void *arg)
         int col_inicio = bloco_col * BLOCO_COLUNAS;
         int col_fim = col_inicio + BLOCO_COLUNAS;
 
-        int primos_deste_bloco = 0;
+        int primos_bloco = 0;
         for (int i = lin_inicio; i < lin_fim; i++)
         {
             for (int j = col_inicio; j < col_fim; j++)
             {
                 if (ehPrimo(matriz[i][j]))
                 {
-                    primos_deste_bloco++;
+                    primos_bloco++;
                 }
             }
         }
 
         pthread_mutex_lock(&mutex_primos);
-        total_primos_paralelo += primos_deste_bloco;
+        total_primos_paralelo += primos_bloco;
         pthread_mutex_unlock(&mutex_primos);
     }
 
@@ -228,7 +222,7 @@ void *funcaoThread(void *arg)
 void buscaParalela()
 {
     total_primos_paralelo = 0;
-    proximo_macrobloco = 0;
+    proximo_bloco = 0;
 
     pthread_mutex_init(&mutex_bloco, NULL);
     pthread_mutex_init(&mutex_primos, NULL);

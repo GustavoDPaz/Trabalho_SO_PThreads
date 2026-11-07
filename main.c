@@ -6,11 +6,11 @@
 #include <math.h>
 #include <time.h>
 
-#define MATRIZ_LINHAS 3000
-#define MATRIZ_COLUNAS 3000
-#define BLOCO_LINHAS 100
-#define BLOCO_COLUNAS 100
-#define NUM_THREADS 8 // eu to pensando aqui, a especificação falou pra só considerar os núcleos de performance, mas ficou meio
+#define MATRIZ_LINHAS 10000
+#define MATRIZ_COLUNAS 10000
+#define BLOCO_LINHAS 1
+#define BLOCO_COLUNAS 1
+#define NUM_THREADS 4 // eu to pensando aqui, a especificação falou pra só considerar os núcleos de performance, mas ficou meio
 // aberto se isso quer dizer que tem que forçar o programa a utilizar só os nucleos de performance (tipo aquela opção do gerenciador)
 // de tarefas de limitar quais CPUs o processo pode usar) ou se é só pra colocar o numero de threads equivalente mesmo.
 // (Eu, André, tenho um notebook com um i5 12450HX, que tem 4 núcleos de performance e 4 de eficiência / 12 threads)
@@ -107,7 +107,7 @@ int ehPrimo(int n)
 
 void alocarMatriz()
 {
-    matriz = (int **)malloc(MATRIZ_LINHAS * sizeof(int *));
+    matriz = (int **)calloc(MATRIZ_LINHAS, sizeof(int *));
     if (matriz == NULL)
     {
         exit(1);
@@ -115,7 +115,7 @@ void alocarMatriz()
 
     for (int i = 0; i < MATRIZ_LINHAS; i++)
     {
-        matriz[i] = (int *)malloc(MATRIZ_COLUNAS * sizeof(int));
+        matriz[i] = (int *)calloc(MATRIZ_COLUNAS, sizeof(int));
         if (matriz[i] == NULL)
         {
             exit(1);

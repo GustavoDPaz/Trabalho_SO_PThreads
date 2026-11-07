@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Manual Explicativo Completo - Introdução à Programação Multithread com PThreads</title>
+<style>
+  @page {
+    size: A4;
+    margin: 20mm 15mm 20mm 15mm;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #1f2937;
+    line-height: 1.6;
+    font-size: 11pt;
+    margin: 0;
+    padding: 0;
+  }
+  h1 {
+    color: #111827;
+    font-size: 20pt;
+    border-bottom: 2px solid #2563eb;
+    padding-bottom: 8px;
+    margin-top: 0;
+  }
+  h2 {
+    color: #1e40af;
+    font-size: 14pt;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 5px;
+    margin-top: 24px;
+    page-break-after: avoid;
+  }
+  h3 {
+    color: #1f2937;
+    font-size: 12pt;
+    margin-top: 18px;
+    page-break-after: avoid;
+  }
+  p, li {
+    text-align: justify;
+  }
+  pre {
+    background-color: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-left: 4px solid #2563eb;
+    padding: 10px;
+    border-radius: 4px;
+    font-family: "Cascadia Code", "Fira Code", Consolas, Courier, monospace;
+    font-size: 9.5pt;
+    overflow-x: auto;
+    page-break-inside: avoid;
+  }
+  code {
+    font-family: "Cascadia Code", Consolas, monospace;
+    background-color: #f3f4f6;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 9.5pt;
+  }
+  .box {
+    background-color: #eff6ff;
+    border-left: 4px solid #3b82f6;
+    padding: 12px;
+    margin: 12px 0;
+    border-radius: 0 4px 4px 0;
+    page-break-inside: avoid;
+  }
+  .box-title {
+    font-weight: bold;
+    color: #1e40af;
+    margin-bottom: 6px;
+  }
+  .qna {
+    background-color: #fefce8;
+    border-left: 4px solid #eab308;
+    padding: 10px 14px;
+    margin: 12px 0;
+    page-break-inside: avoid;
+  }
+  .qna-question {
+    font-weight: bold;
+    color: #854d0e;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    page-break-inside: avoid;
+  }
+  th, td {
+    border: 1px solid #d1d5db;
+    padding: 8px 10px;
+    text-align: left;
+    font-size: 10pt;
+  }
+  th {
+    background-color: #f9fafb;
+    color: #374151;
+  }
+  .page-break {
+    page-break-before: always;
+  }
+</style>
+</head>
+<body>
+
+<h1>Manual Explicativo Completo do Código</h1>
+<p><strong>Disciplina:</strong> Sistemas Operacionais | <strong>Professor:</strong> Flávio Giraldeli<br>
+<strong>Tema:</strong> Introdução à Programação Multithread com PThreads (Busca Concorrente de Números Primos)</p>
+
+<div class="box">
+  <div class="box-title">Objetivo deste documento</div>
+  Este material explica detalhadamente, bloco por bloco e linha por linha, como o código do arquivo <code>main.c</code> funciona. Foi elaborado com o raciocínio claro e direto de um estudante de Sistemas Operacionais, fornecendo toda a bagagem necessária para compreender o programa e responder a qualquer pergunta em uma entrevista presencial.
+</div>
+
+<h2>1. Visão Geral do Problema</h2>
+<p>
+O trabalho consiste em receber uma matriz de números naturais pseudoaleatórios (entre 0 e 31999) gerada com semente fixa e contar quantos números primos existem nela, comparando duas abordagens:
+</p>
+<ol>
+  <li><strong>Busca Serial:</strong> Uma única thread percorre toda a matriz elemento por elemento sequencialmente. Esse tempo serve como linha de base (referência).</li>
+  <li><strong>Busca Paralela:</strong> Múltiplas threads dividem a tarefa trabalhando em "macroblocos" (submatrizes). A thread que termina seu macrobloco busca imediatamente o próximo macrobloco livre na fila global compartilhada.</li>
+</ol>
+
+<h2>2. As Bibliotecas Incluídas</h2>
+<pre><code>#include &lt;pthread.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;math.h&gt;
+#include &lt;time.h&gt;</code></pre>
+<ul>
+  <li><code>pthread.h</code>: Funções para criação, manipulação e sincronização de threads POSIX (<code>pthread_create</code>, <code>pthread_join</code>, <code>pthread_mutex_t</code>).</li>
+  <li><code>stdio.h</code>: Funções de entrada e saída padrão (<code>printf</code>).</li>
+  <li><code>stdlib.h</code>: Alocação dinâmica de memória (<code>malloc</code>, <code>free</code>) e gerador de números aleatórios (<code>rand</code>, <code>srand</code>).</li>
+  <li><code>math.h</code>: Função <code>sqrt()</code> para calcular a raiz quadrada na verificação de números primos.</li>
+  <li><code>time.h</code>: Função padrão <code>clock()</code> e constante <code>CLOCKS_PER_SEC</code> para medição do tempo de execução.</li>
+</ul>
+
+<h2>3. Configurações Parametrizadas (#define)</h2>
+<pre><code>#define MATRIZ_LINHAS 1000
+#define MATRIZ_COLUNAS 1000
+#define BLOCO_LINHAS 100
+#define BLOCO_COLUNAS 100
+#define NUM_THREADS 4
+#define SEMENTE 42</code></pre>
+<ul>
+  <li><strong>Por que usar <code>#define</code>?</strong> O professor exige parametrização para poder testar com facilidade diferentes tamanhos de matriz (ex: 10000x10000) e diferentes dimensões de macroblocos (de 1x1 até a matriz inteira) sem alterar o código das funções.</li>
+  <li><strong><code>SEMENTE 42</code>:</strong> Garante reprodutibilidade. Como <code>srand(42)</code> é fixo, a matriz conterá exatamente os mesmos números em todas as execuções, permitindo comparar de forma justa o tempo serial com o tempo paralelo.</li>
+</ul>
+
+<div class="page-break"></div>
+
+<h2>4. Variáveis Globais e Sincronização</h2>
+<pre><code>int **matriz = NULL;
+int total_primos_paralelo = 0;
+int proximo_macrobloco = 0;
+int total_macroblocos = 0;
+
+pthread_mutex_t mutex_bloco;
+pthread_mutex_t mutex_primos;</code></pre>
+
+<p>O professor exigiu no PDF que a matriz e as variáveis de controle fossem <strong>globais e compartilhadas</strong>:</p>
+<ul>
+  <li><code>matriz</code>: Ponteiro para ponteiro (<code>int**</code>) que apontará para a matriz alocada dinamicamente no heap.</li>
+  <li><code>total_primos_paralelo</code>: Variável acumuladora onde todas as threads somam os primos que encontram.</li>
+  <li><code>proximo_macrobloco</code>: Atua como uma "senha de balcão". Começa em 0. Cada thread que quer trabalhar pega o valor atual e incrementa esta variável.</li>
+  <li><code>mutex_bloco</code>: Exclusão mútua que impede que duas threads peguem o mesmo macrobloco simultaneamente.</li>
+  <li><code>mutex_primos</code>: Exclusão mútua que impede que duas threads alterem <code>total_primos_paralelo</code> ao mesmo instante, evitando condição de corrida (Race Condition).</li>
+</ul>
+
+<h2>5. Verificação de Números Primos: A Função <code>ehPrimo</code></h2>
+<pre><code>int ehPrimo(int n)
+{
+    if (n &lt; 2)
+    {
+        return 0;
+    }
+
+    int squirtle = sqrt(n);
+    for (int i = 2; i &lt;= squirtle; i++)
+    {
+        if (n % i == 0)
+        {
+            return 0;
+        }
+    }
+    return 1;
+}</code></pre>
+
+<h3>O Raciocínio por trás desta função:</h3>
+<ol>
+  <li><strong>Caso base (<code>n &lt; 2</code>):</strong> 0 e 1 não são primos por definição matemática.</li>
+  <li><strong>O cálculo de <code>squirtle = sqrt(n)</code> fora do loop:</strong> Matematicamente, se um número $n$ tem um divisor composto, pelo menos um dos fatores é menor ou igual à sua raiz quadrada. Calcular a raiz uma única vez fora do loop economiza milhões de operações desnecessárias.</li>
+  <li><strong>Interrupção imediata:</strong> Se <code>n % i == 0</code>, significa que encontramos um divisor; portanto, o número não é primo e a função retorna <code>0</code> imediatamente.</li>
+</ol>
+
+<div class="page-break"></div>
+
+<h2>6. Medição Tradicional de Tempo com <code>clock()</code></h2>
+<pre><code>clock_t inicio_serial = clock();
+int primos_serial = buscaSerial();
+clock_t fim_serial = clock();
+double tempo_serial = (double)(fim_serial - inicio_serial) / CLOCKS_PER_SEC;</code></pre>
+<p>
+Utiliza a função canônica <code>clock()</code> da biblioteca padrão <code>&lt;time.h&gt;</code>. Ela registra o instante de início e fim da busca, dividindo a diferença pela constante <code>CLOCKS_PER_SEC</code> para obter o tempo em segundos.
+</p>
+
+<h2>7. Gerenciamento de Memória Dinâmica</h2>
+
+<h3>A. Alocação (<code>alocarMatriz</code>)</h3>
+<pre><code>void alocarMatriz()
+{
+    matriz = (int **)malloc(MATRIZ_LINHAS * sizeof(int *));
+    if (matriz == NULL) exit(1);
+
+    for (int i = 0; i &lt; MATRIZ_LINHAS; i++)
+    {
+        matriz[i] = (int *)malloc(MATRIZ_COLUNAS * sizeof(int));
+        if (matriz[i] == NULL) exit(1);
+    }
+}</code></pre>
+
+<h3>B. Preenchimento e Liberação</h3>
+<pre><code>void preencherMatriz()
+{
+    srand(SEMENTE);
+    for (int i = 0; i &lt; MATRIZ_LINHAS; i++)
+    {
+        for (int j = 0; j &lt; MATRIZ_COLUNAS; j++)
+        {
+            matriz[i][j] = rand() % 32000;
+        }
+    }
+}
+
+void liberarMatriz()
+{
+    if (matriz != NULL)
+    {
+        for (int i = 0; i &lt; MATRIZ_LINHAS; i++) free(matriz[i]);
+        free(matriz);
+        matriz = NULL;
+    }
+}</code></pre>
+
+<div class="page-break"></div>
+
+<h2>8. A Busca Paralela e as Threads</h2>
+
+<h3>A. A Rotina da Thread (<code>funcaoThread</code>)</h3>
+<pre><code>void *funcaoThread(void *arg)
+{
+    int id = *(int *)arg;
+    int blocos_por_linha = MATRIZ_COLUNAS / BLOCO_COLUNAS;
+    int blocos_processados = 0;
+
+    while (1)
+    {
+        int meu_bloco = -1;
+
+        pthread_mutex_lock(&mutex_bloco);
+        if (proximo_macrobloco &lt; total_macroblocos)
+        {
+            meu_bloco = proximo_macrobloco;
+            proximo_macrobloco++;
+        }
+        pthread_mutex_unlock(&mutex_bloco);
+
+        if (meu_bloco == -1) break;
+
+        blocos_processados++;
+
+        int bloco_lin = meu_bloco / blocos_por_linha;
+        int bloco_col = meu_bloco % blocos_por_linha;
+
+        int lin_inicio = bloco_lin * BLOCO_LINHAS;
+        int lin_fim = lin_inicio + BLOCO_LINHAS;
+
+        int col_inicio = bloco_col * BLOCO_COLUNAS;
+        int col_fim = col_inicio + BLOCO_COLUNAS;
+
+        int primos_deste_bloco = 0;
+        for (int i = lin_inicio; i &lt; lin_fim; i++)
+        {
+            for (int j = col_inicio; j &lt; col_fim; j++)
+            {
+                if (ehPrimo(matriz[i][j]))
+                {
+                    primos_deste_bloco++;
+                }
+            }
+        }
+
+        pthread_mutex_lock(&mutex_primos);
+        total_primos_paralelo += primos_deste_bloco;
+        pthread_mutex_unlock(&mutex_primos);
+    }
+    return NULL;
+}</code></pre>
+
+<h3>Pontos Cruciais para Entender e Defender:</h3>
+<ol>
+  <li><strong>O parâmetro <code>arg</code>:</strong> Passamos o ID da thread (<code>int id = *(int *)arg;</code>) para que cada thread saiba seu índice numérico e possa contabilizar quantos blocos processou.</li>
+  <li><strong>A Seção Crítica 1 (Fila Dinâmica):</strong> Garante que cada macrobloco seja processado por exatamente uma thread.</li>
+  <li><strong>Cálculo $O(1)$ das coordenadas:</strong> Convertemos o índice linear <code>meu_bloco</code> em coordenadas de início e fim da submatriz usando divisão inteira e resto, sem gastar 1 byte de RAM extra.</li>
+  <li><strong>A Seção Crítica 2 (Soma Global):</strong> Cada thread conta os primos do bloco localmente em <code>primos_deste_bloco</code> e só trava o <code>mutex_primos</code> uma vez ao final de cada bloco.</li>
+</ol>
+
+<div class="page-break"></div>
+
+<h2>9. Perguntas Frequentes do Professor na Entrevista</h2>
+
+<div class="qna">
+  <div class="qna-question">P: Por que você usou dois mutexes diferentes em vez de usar apenas um?</div>
+  <p><strong>R:</strong> Porque são seções críticas independentes! O <code>mutex_bloco</code> cuida da distribuição de tarefas, enquanto o <code>mutex_primos</code> cuida da soma do total de primos. Se usássemos apenas um mutex para tudo, uma thread que estivesse apenas somando primos iria bloquear outra thread que só queria pegar uma nova tarefa, gerando contenção desnecessária e reduzindo o desempenho.</p>
+</div>
+
+<div class="qna">
+  <div class="qna-question">P: O que acontece se removermos os mutexes?</div>
+  <p><strong>R:</strong> Ocorrerão Condições de Corrida (Race Conditions). Múltiplas threads lerão a variável global de primos com o mesmo valor antigo e sobrescreverão o valor umas das outras (perda de atualizações). Como resultado, a contagem final paralela será <strong>menor</strong> do que a contagem serial correta. Isso fica mais grave quanto menores forem os macroblocos, pois mais disputas simultâneas acontecem.</p>
+</div>
+
+<div class="qna">
+  <div class="qna-question">P: O que é Speedup e por que com 4 threads ele não atinge exatamente 4.0x?</div>
+  <p><strong>R:</strong> O Speedup é a razão entre o tempo serial e o tempo paralelo: $S = \frac{T_{serial}}{T_{paralelo}}$. Ele não chega a 4.0x perfeito devido a fatores explicados pela Lei de Amdahl: existe uma parte do código que é puramente serial (como inicializar variáveis e criar as threads), além do custo operacional do Sistema Operacional (overhead de criação de threads, trocas de contexto e espera nos mutexes).</p>
+</div>
+
+</body>
+</html>

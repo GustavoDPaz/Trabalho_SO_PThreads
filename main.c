@@ -4,16 +4,22 @@
 #include <stdlib.h>
 #include <time.h>
 
+// apaga os comentario mais doidinho antes da gente enviar
+
 #define MATRIZ_LINHAS 10000
 #define MATRIZ_COLUNAS 10000
 #define BLOCO_LINHAS 100
 #define BLOCO_COLUNAS 100
+// eu to pensando aqui, a especificação falou pra só considerar os núcleos de performance, mas ficou meio
+// aberto se isso quer dizer que tem que forçar o programa a utilizar só os nucleos de performance (tipo aquela opção do gerenciador)
+// de tarefas de limitar quais CPUs o processo pode usar) ou se é só pra colocar o numero de threads equivalente mesmo.
+// (Eu, André, tenho um notebook com um i5 12450HX, que tem 4 núcleos de performance e 4 de eficiência / 12 threads)
 #define NUM_THREADS 12
 #define SEMENTE 42
 
 int **matriz = NULL;
 int total_primos_paralelo = 0;
-int proximo_bloco = 0;
+int proximo_macrobloco = 0;
 int total_macroblocos = 0;
 
 pthread_mutex_t mutex_bloco;  // mutex q controla o acesso a blocos
@@ -55,6 +61,11 @@ int percorrer(int lin, int col, int m[lin][col])
 */
 
 int main() {
+  // A especificação não dizia o que fazer caso o tamanho do bloco seja divisivel pelo tamanho da matriz mas o numero de linhas
+  // ou colunas do bloco não é divisível pelo numero de linhas ou colunas da matriz, então decidimos simplesmente não deixar.
+  // Eu acho que eu fui a unica pessoa que ficou quebrando a cabeça com isso, então acho que era isso que o trabalho queria
+  // mesmo, mas acho que seria interessante revisitar esse problema depois de divisão de matriz sem necessariamente exigir
+  // blocos "visualmente continuos".
   if (MATRIZ_LINHAS % BLOCO_LINHAS != 0 ||
       MATRIZ_COLUNAS % BLOCO_COLUNAS != 0) {
     printf("Erro: As dimensoes da matriz devem ser multiplas do macrobloco!\n");
@@ -77,6 +88,8 @@ int main() {
   int primos_serial = buscaSerial();
   clock_t fim_serial = clock();
   double tempo_serial = (double)(fim_serial - inicio_serial) / CLOCKS_PER_SEC;
+  // todo mundo usa os mesmo nomes de variável, o que é muito chato, mas acho que eu nao tenho capacidade mental de usar o tipo
+  // de nome que eu usava em prog 2 num problema complicado desses então estou deixando aqui nomes bonitinhos
 
   printf("Serial - Primos: %d | Tempo: %.4f s\n", primos_serial, tempo_serial);
 
@@ -100,11 +113,15 @@ int main() {
 }
 
 int ehPrimo(int n) {
+  // sinceramente, não sei se deixar isso aqui deixa a função "menos otimizada" que nem a especificação pede
+  // ou mais otimizada, como os testes variam muito acho que precisa de uma análise estatística que eu n vou
+  // fazer nem ferrando pq n pediram mesmo
   if (n < 2) {
     return 0;
   }
 
   int squirtle = sqrt(n);
+  // probleminha de prog 1, saudades
   for (int i = 2; i <= squirtle; i++) {
     if (n % i == 0) {
       return 0;
@@ -148,6 +165,7 @@ void liberarMatriz() {
 }
 
 int buscaSerial() {
+  // c = contador 😱
   int contador = 0;
   for (int i = 0; i < MATRIZ_LINHAS; i++) {
     for (int j = 0; j < MATRIZ_COLUNAS; j++) {
@@ -175,6 +193,7 @@ void *funcaoThread(void *arg) {
     pthread_mutex_unlock(&mutex_bloco);
 
     if (meu_bloco == -1) {
+      // finalmente uma matéria nesse curso que a gente pode usar while "true" e break
       break;
     }
 
